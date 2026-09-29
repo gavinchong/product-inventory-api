@@ -1,0 +1,47 @@
+name: product-inventory-api
+
+services:
+  app:
+    build: .
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DOCKER_DB_DATABASE:-inventory}
+      DB_USERNAME: ${DOCKER_DB_USERNAME:-inventory}
+      DB_PASSWORD: ${DOCKER_DB_PASSWORD:-inventory_local}
+    volumes:
+        # - .:/var/www/html
+      - ./.env:/var/www/html/.env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:${DOCKER_APP_PORT:-8000}:80"
+    volumes:
+      - ./public:/var/www/html/public:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: ${DOCKER_DB_DATABASE:-inventory}
+      MARIADB_USER: ${DOCKER_DB_USERNAME:-inventory}
+      MARIADB_PASSWORD: ${DOCKER_DB_PASSWORD:-inventory_local}
+      MARIADB_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-root_local}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  db-data:
